@@ -106,6 +106,29 @@ async def send_to_email(data: NotificationInput, target_email: str):
         return {"status": "Email sent successfully", "task_id": new_task.id}
     else:
         raise HTTPException(status_code=500, detail="Failed to send email")
+    
+@app.post("/ntfy/send", tags=["NTFY (Mobile)"])
+async def send_to_ntfy_standalone(data: NotificationInput):
+    with Session(engine) as session:
+        new_task = HITLTask(
+            agent_id=data.agent_id, 
+            context=data.context, 
+            urgency=data.urgency,
+            status="pending"
+        )
+        session.add(new_task)
+        session.commit()
+        session.refresh(new_task)
+
+    # Καλούμε τη συνάρτηση από το ntfy.py
+    await broadcast_to_ntfy(
+        new_task.agent_id, 
+        new_task.context, 
+        task_id=new_task.id, 
+        base_url=BASE_URL
+    )
+    
+    return {"status": "Sent to Mobile", "task_id": new_task.id}
 
 # --- 2. MULTI-CHANNEL REQUEST (DISCORD + NTFY) ---
 @app.post("/hitl/request", tags=["HITL Main"])
