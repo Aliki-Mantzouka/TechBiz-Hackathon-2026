@@ -16,7 +16,7 @@ class HITLTask(SQLModel, table=True):
     context: str
     urgency: str  # low, medium, high
     status: str = "pending" # pending, approved, rejected 
-
+    callback_url: Optional[str] = None  # Η "διεύθυνση" επιστροφής του Agent
 
 sqlite_url = "sqlite:///database.db"
 engine = create_engine(sqlite_url)
@@ -26,6 +26,9 @@ app = FastAPI()
 @app.on_event("startup")
 def on_startup():
     SQLModel.metadata.create_all(engine)
+
+
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1487051436456939620/usdfzS6VGQ2cbGtJsGlP5MblxJdcWiN58QNkGBTwGn6ivn-aIffdXJVrnmVvzbEZ3yrc"
 
 # VIBER SETTINGS
 VIBER_TOKEN = "YOUR_VIBER_TOKEN"
@@ -78,7 +81,6 @@ def receive_from_agent(data: dict):
     print(f"Έλαβα δεδομένα: {data}")
     return {"status": "received", "data_content": data}
 
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1487051436456939620/usdfzS6VGQ2cbGtJsGlP5MblxJdcWiN58QNkGBTwGn6ivn-aIffdXJVrnmVvzbEZ3yrc"
 
 @app.post("/hitl/request")
 async def create_hitl_request(task: HITLTask):
@@ -90,11 +92,19 @@ async def create_hitl_request(task: HITLTask):
         
         # 3. Routing στο Discord (Multi-channel delivery [cite: 43])
         message = {
-            "content": f"🚨 **New HITL Request**\n**Agent:** {task.agent_id}\n**Urgency:** {task.urgency}\n**Context:** {task.context}\n**Task ID:** {task.id}"
+            "content": f"🚨 **New HITL Request**\n"
+                       f"**Agent:** {task.agent_id}\n"
+                       f"**Urgency:** {task.urgency}\n"
+                       f"**Context:** {task.context}\n"
+                       f"**Task ID:** {task.id}"
         }
         
         async with httpx.AsyncClient() as client:
-            await client.post(DISCORD_WEBHOOK_URL, json=message)
+            try:
+                response = await client.post(DISCORD_WEBHOOK_URL, json=message)
+                response.raise_for_status() # Θα πετάξει error αν το URL είναι λάθος
+            except Exception as e:
+                print(f"Discord Error: {e}")
             
     return {"status": "queued", "task_id": task.id}
 
@@ -118,10 +128,13 @@ async def human_respond(task_id: int, decision: str, feedback: Optional[str] = N
         session.commit()
         session.refresh(task)
         
-        print(f"Task {task_id} updated to {decision} by human.")
-        
-        return {
-            "message": f"Task {task_id} is now {decision}",
-            "audit_log": f"Updated at {datetime.now()}"
-        }
-    
+       # 3. WEBHOOK CALLBACK: Ειδοποίηση του Agent 
+        if task.callback_url:
+            async with httpx.AsyncClient() as client:
+                try:
+                    payload = {"task_id": task_id, "decision": decision, "feedback": feedback}
+                    await client.post(task.callback_url, json=payload)
+                except Exception as e:
+                    print(f"Callback Failed: {e}")
+
+        return {"message": f"Task {task_id} marked as {decision}", "notified_agent": bool(task.callback_url)}
