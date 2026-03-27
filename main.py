@@ -5,14 +5,7 @@ from typing import Optional
 from pydantic import BaseModel
 import httpx
 
-# 1. Μοντέλο Βάσης Δεδομένων
-class HITLTask(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    agent_id: str
-    context: str
-    urgency: str
-    status: str = "pending"
-    callback_url: Optional[str] = None
+from database import engine, HITLTask, SQLModel
 
 # 2. Μοντέλο για το Swagger (Μόνο τα πεδία που θέλεις να συμπληρώνεις)
 class NotificationInput(BaseModel):
@@ -21,7 +14,6 @@ class NotificationInput(BaseModel):
     urgency: str
 
 sqlite_url = "sqlite:///database.db"
-engine = create_engine(sqlite_url)
 
 app = FastAPI(title="Multi-Channel HITL Gateway")
 
@@ -90,3 +82,6 @@ async def human_respond(task_id: int, decision: str):
                     print(f"Callback failed: {e}")
         
         return {"message": f"Task {task_id} updated to {decision}"}
+
+from hitl_engine import router as hitl_router
+app.include_router(hitl_router)
