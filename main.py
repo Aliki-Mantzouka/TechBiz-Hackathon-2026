@@ -6,13 +6,7 @@ from pydantic import BaseModel
 import httpx
 from ntfy import broadcast_to_ntfy
 
-# 1. Μοντέλο Βάσης Δεδομένων
-class HITLTask(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    agent_id: str
-    context: str
-    urgency: str
-    status: str = "pending"
+from database import engine, HITLTask, SQLModel
 
 # 2. Μοντέλο για το Swagger (Μόνο τα πεδία που θέλεις να συμπληρώνεις)
 class NotificationInput(BaseModel):
@@ -21,7 +15,6 @@ class NotificationInput(BaseModel):
     urgency: str
 
 sqlite_url = "sqlite:///database.db"
-engine = create_engine(sqlite_url)
 
 app = FastAPI(title="Multi-Channel HITL Gateway")
 
@@ -68,8 +61,26 @@ async def send_to_ntfy(data: NotificationInput):
 async def human_respond(task_id: int, decision: str):
     with Session(engine) as session:
         task = session.get(HITLTask, task_id)
-        if not task: raise HTTPException(status_code=404, detail="Task not found")
+        if not task: 
+            raise HTTPException(status_code=404, detail="Task not found")
+        
         task.status = decision
         session.add(task)
         session.commit()
+        session.refresh(task) # Refresh για να πάρουμε το callback_url
+
+        # --- CALLBACK LOGIC ---
+        if task.callback_url:
+            async with httpx.AsyncClient() as client:
+                try:
+                    await client.post(task.callback_url, json={
+                        "task_id": task_id,
+                        "decision": decision
+                    })
+                except Exception as e:
+                    print(f"Callback failed: {e}")
+        
         return {"message": f"Task {task_id} updated to {decision}"}
+
+from hitl_engine import router as hitl_router
+app.include_router(hitl_router)
