@@ -6,7 +6,7 @@ from email.mime.multipart import MIMEMultipart
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = "insert your email"
-SENDER_PASSWORD = "16-digit password"
+SENDER_PASSWORD = "rvgm psaf yxod geqz"
 
 async def send_approval_email(agent_id: str, context: str, task_id: int, receiver_email: str, base_url: str):
     """
