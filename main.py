@@ -6,6 +6,7 @@ import httpx
 import smtplib
 from email.mime.text import MIMEText
 from typing import Optional
+from email.mime.multipart import MIMEMultipart
 
 # --- ΕΙΣΑΓΩΓΗ ΑΠΟ ΤΑ ΔΙΚΑ ΣΟΥ ΑΡΧΕΙΑ ---
 from ntfy import broadcast_to_ntfy
@@ -16,8 +17,8 @@ app = FastAPI(title="Multi-Channel HITL Gateway")
 # --- ΡΥΘΜΙΣΕΙΣ EMAIL ---
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SENDER_EMAIL = "insert your email"
-SENDER_PASSWORD = "16-digit code"
+SENDER_EMAIL = "evavioleti04@gmail.com"
+SENDER_PASSWORD = "rvgm psaf yxod geqz"
 
 # Δημιουργία πινάκων στην εκκίνηση
 @app.on_event("startup")
@@ -34,21 +35,35 @@ class NotificationInput(BaseModel):
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1487051436456939620/usdfzS6VGQ2cbGtJsGlP5MblxJdcWiN58QNkGBTwGn6ivn-aIffdXJVrnmVvzbEZ3yrc"
 
 # --- ΣΥΝΑΡΤΗΣΗ ΑΠΟΣΤΟΛΗΣ EMAIL ---
-async def send_approval_email(agent_id: str, context: str, task_id: int, receiver_email: str):
+async def send_approval_email(agent_id: str, context: str, task_id: int, receiver_email: str, base_url: str):
     subject = f"🚨 HITL Action Required (ID: {task_id})"
-    body = f"""
-    Γεια σου,
-    Υπάρχει ένα νέο αίτημα που απαιτεί την έγκρισή σου:
-    --------------------------------------
-    ID Εργασίας: {task_id}
-    Agent: {agent_id}
-    Περιεχόμενο: {context}
-    --------------------------------------
+    # Δημιουργία των links για τα κουμπιά
+    approve_url = f"{base_url}/hitl-v2/respond/{task_id}?decision=approved"
+    reject_url = f"{base_url}/hitl-v2/respond/{task_id}?decision=rejected"
+
+    # Δημιουργία του HTML σώματος με τα κουμπιά
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif;">
+        <h2>Νέο Αίτημα Έγκρισης</h2>
+        <p>Ο Agent <b>{agent_id}</b> ζητάει έγκριση για το εξής:</p>
+        <blockquote style="background: #f4f4f4; padding: 10px; border-left: 5px solid #ccc;">
+            {context}
+        </blockquote>
+        <div style="margin-top: 20px;">
+            <a href="{approve_url}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">✅ APPROVE</a>
+            <a href="{reject_url}" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">❌ REJECT</a>
+        </div>
+    </body>
+    </html>
     """
-    msg = MIMEText(body)
+
+    msg = MIMEMultipart("alternative")
     msg['Subject'] = subject
     msg['From'] = SENDER_EMAIL
     msg['To'] = receiver_email
+    msg.attach(MIMEText(html_body, 'html'))
+
     try:
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
@@ -59,6 +74,7 @@ async def send_approval_email(agent_id: str, context: str, task_id: int, receive
     except Exception as e:
         print(f"❌ Email error: {e}")
         return False
+    
 
 # --- 1. DISCORD SECTION ---
 @app.post("/discord/send", tags=["Discord"])
@@ -90,18 +106,33 @@ async def send_to_ntfy(data: NotificationInput):
 @app.post("/email/send", tags=["Email"])
 async def send_to_email(data: NotificationInput, target_email: str):
     with Session(engine) as session:
-        new_task = HITLTask(agent_id=data.agent_id, context=data.context, urgency=data.urgency)
+        new_task = HITLTask(
+            agent_id=data.agent_id, 
+            context=data.context, 
+            urgency=data.urgency,
+            status="pending"
+        )
         session.add(new_task)
         session.commit()
-        session.refresh(new_task)
+        session.refresh(new_task) # Εδώ η SQLModel μας δίνει το πραγματικό new_task.id
 
-    success = await send_approval_email(new_task.agent_id, new_task.context, new_task.id, target_email)
+    # 2. Στέλνουμε το email χρησιμοποιώντας το πραγματικό ID
+    success = await send_approval_email(
+        agent_id=new_task.agent_id,
+        context=new_task.context,
+        task_id=new_task.id,      # ΤΟ ΠΡΑΓΜΑΤΙΚΟ ID ΑΠΟ ΤΗ ΒΑΣΗ
+        receiver_email=target_email,
+        base_url=BASE_URL
+    )
     
-    if not success:
-        # Αν αποτύχει, στείλε σφάλμα 500
-        raise HTTPException(status_code=500, detail="Failed to send email. Check server logs.")
-    
-    return {"status": "Email Sent Successfully", "task_id": new_task.id}
+    if success:
+        return {
+            "status": "Email sent successfully", 
+            "task_id": new_task.id, 
+            "info": "Check your inbox for the buttons!"
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send email")
 
 # --- 4. MANAGEMENT SECTION ---
 @app.post("/hitl/respond/{task_id}", tags=["Management"])
