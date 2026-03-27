@@ -13,11 +13,11 @@ router = APIRouter(prefix="/hitl-v2", tags=["HITL Engine"])
 
 BASE_URL = "https://duteously-postsymphysial-shad.ngrok-free.dev"
 
-# EMAIL SETTINGS (Αντέγραψέ τα από το main αν χρειαστεί)
+# EMAIL SETTINGS 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = "evavioleti04@gmail.com"
-SENDER_PASSWORD = "your-app-password" 
+SENDER_PASSWORD = "rvgm psaf yxod geqz" 
 ADMIN_EMAIL = "manager-email@example.com"
 
 @router.get("/dashboard", response_class=HTMLResponse)
