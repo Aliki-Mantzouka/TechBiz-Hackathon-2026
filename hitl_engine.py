@@ -16,8 +16,8 @@ BASE_URL = "https://duteously-postsymphysial-shad.ngrok-free.dev"
 # EMAIL SETTINGS 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SENDER_EMAIL = "evavioleti04@gmail.com"
-SENDER_PASSWORD = "rvgm psaf yxod geqz" 
+SENDER_EMAIL = "your email"
+SENDER_PASSWORD = "your 16-digit app password" 
 ADMIN_EMAIL = "manager-email@example.com"
 
 @router.get("/dashboard", response_class=HTMLResponse)
