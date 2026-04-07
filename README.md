@@ -15,10 +15,12 @@ Verified Account: An ngrok account and Authtoken installation are required.
 Active Tunneling: ngrok must be running on port 8001 (ngrok http 8001) so that interactive buttons are accessible from external networks.
 
 # 3. Communication Channel Settings
-Discord: An active Webhook URL for sending messages with masked links.
-ntfy (Mobile): Create a free Notify name (e.g., eva04) to receive push notifications with Action Buttons on mobile devices.
-Email (Gmail): Use of a 16-digit App Password (not the regular account password) for sending interactive HTML emails.
 
+Email (Gmail): Use of a 16-digit App Password (not the regular account password) for sending interactive HTML emails.
+Notify (ntfy): Create a free Notify name (e.g., eva04) to receive push notifications with Action Buttons.
+Discord: An active Webhook URL for sending messages with masked links.
+
+Demo videos for Email (Gmail), Notify (ntfy) and Discord:
 ---
 ![Hackathon-Email](images/hackathon-email.gif)
 ![Hackathon NTFY](images/hackathon-ntfy.gif)
